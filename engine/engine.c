@@ -8,16 +8,22 @@ extern khook_t __khook_tbl_end[];
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static void *
-khook_lookup_name(const char *name)
+static int ksym_lookup_cb(unsigned long data[], const char *name, void *module, unsigned long addr)
 {
-	void *address = (void *)kallsyms_lookup_name(name);
-	pr_debug("kallsyms_lookup_name(%s) = %p\n", name, address);
-	return address;
+	int i = 0; while (!module && (((const char *)data[0]))[i] == name[i]) {
+		if (!name[i++]) return !!(data[1] = addr);
+	} return 0;
 }
 
-static void *
-khook_map_writable(void *addr, size_t len)
+static void *khook_lookup_name(const char *name)
+{
+	unsigned long data[2] = { (unsigned long)name, 0 };
+	kallsyms_on_each_symbol((void *)ksym_lookup_cb, data);
+	pr_debug("symbol(%s) = %p\n", name, (void *)data[1]);
+	return (void *)data[1];
+}
+
+static void *khook_map_writable(void *addr, size_t len)
 {
 	int i;
 	void *vaddr = NULL;
