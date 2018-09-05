@@ -129,14 +129,27 @@ int khook_init(void)
 	return 0;
 }
 
-static int __khook_cleanup_hooks(void *arg)
+static int __khook_cleanup_hooks(void *wakeup)
 {
 	khook_t *s;
 
 	khook_foreach(s) {
-		if (atomic_read(&s->usage) == 1)
-			memcpy(s->target_map, s->origin, s->length);
+		if (atomic_read(&s->usage) == 0) continue;
+		memcpy(s->target_map, s->origin, s->length);
 	}
+
+	return 0;
+}
+
+static int __khook_try_to_wakeup(void *arg)
+{
+	struct task_struct *g, *p;
+
+	do_each_thread(g, p) {
+		if (!g->mm || (g->flags & PF_KTHREAD)) continue;
+		send_sig(SIGSTOP, g, 1);
+		send_sig(SIGCONT, g, 1);
+	} while_each_thread(g, p);
 
 	return 0;
 }
@@ -148,8 +161,10 @@ void khook_cleanup(void)
 	stop_machine(__khook_cleanup_hooks, NULL, NULL); /* restore patches */
 
 	khook_foreach(s) {
-		while (atomic_read(&s->usage) > 1)
-			msleep_interruptible(500);
+		while (atomic_read(&s->usage) > 1) {
+			msleep_interruptible(1000);
+			stop_machine(__khook_try_to_wakeup, NULL, NULL);
+		}
 
 		if (s->target_map)
 			vunmap((void *)((unsigned long)s->target_map & PAGE_MASK));
