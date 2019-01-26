@@ -143,13 +143,11 @@ static int __khook_cleanup_hooks(void *wakeup)
 
 static int __khook_try_to_wakeup(void *arg)
 {
-	struct task_struct *g, *p;
+	struct task_struct *p;
 
-	do_each_thread(g, p) {
-		if (!g->mm || (g->flags & PF_KTHREAD)) continue;
-		send_sig(SIGSTOP, g, 1);
-		send_sig(SIGCONT, g, 1);
-	} while_each_thread(g, p);
+	for_each_process(p) {
+		wake_up_process(p);
+	}
 
 	return 0;
 }

@@ -8,6 +8,10 @@
 #include <linux/version.h>
 #include <linux/sched.h>
 
+#ifndef for_each_process
+# include <linux/sched/signal.h>
+#endif
+
 typedef struct {
 	atomic_t	usage;
 
