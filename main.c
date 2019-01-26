@@ -1,8 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
-#include "engine/engine.h"
-#include "engine/engine.c"
+#include "khook/engine.c"
 
 ////////////////////////////////////////////////////////////////////////////////
 // An example of using KHOOK

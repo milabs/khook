@@ -4,10 +4,9 @@ KHOOK - Linux Kernel hooking engine.
 
 # Usage
 
-Include the engine:
+Include KHOOK engine:
 ~~~
-#include "engine/engine.h"
-#include "engine/engine.c"
+#include "khook/engine.c"
 ~~~
 
 Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine properly.
