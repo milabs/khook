@@ -25,14 +25,14 @@ typedef struct {
 	khook_t __attribute__((unused, section(".data.khook"), aligned(1))) KHOOK_##t
 
 #define KHOOK_(t)							\
-	void __attribute__((alias("khook_" # t))) khook_h_##t(void);	\
-	void notrace khook_o_##t(void) {				\
-		asm volatile ( ".rept 32; nop; .endr");			\
+	static inline typeof(t) khook_##t; /* forward decl */		\
+	static inline void notrace __khook_##t(void) {			\
+		asm volatile (".rept 32; nop; .endr");			\
 	}								\
 	KHOOK_T_DEF(t) = {						\
 		.name = #t,						\
-		.origin = (void *)&khook_o_##t,				\
-		.handlr = (void *)&khook_h_##t,				\
+		.origin = (void *)&__khook_##t,				\
+		.handlr = (void *)&khook_##t,				\
 		.usage = ATOMIC_INIT(0),				\
 	}
 
