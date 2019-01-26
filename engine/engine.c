@@ -47,12 +47,8 @@ static void *khook_map_writable(void *addr, size_t len)
 #include <asm/insn.h>
 
 static struct {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
-	void (* init)(struct insn *, const void *, int, int); /* since 3.19 */
-#else
-	void (* init)(struct insn *, const void *, int);
-#endif
-	void (* get_length)(struct insn *);
+	typeof(insn_init) *init;
+	typeof(insn_get_length) *get_length;
 } insn_api;
 
 static inline void x86_put_jmp(void *a, void *f, void *t)
