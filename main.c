@@ -14,10 +14,8 @@ static int khook_inode_permission(struct inode *inode, int mask)
 {
 	int ret = 0;
 
-	KHOOK_GET(inode_permission);
 	ret = KHOOK_ORIGIN(inode_permission, inode, mask);
 	printk("%s(%p, %08x) = %d\n", __func__, inode, mask, ret);
-	KHOOK_PUT(inode_permission);
 
 	return ret;
 }
@@ -33,10 +31,8 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 {
 	int ret = 0;
 
-	KHOOK_GET(load_elf_binary);
 	ret = KHOOK_ORIGIN(load_elf_binary, bprm);
 	printk("%s(%p) = %d\n", __func__, bprm, ret);
-	KHOOK_PUT(load_elf_binary);
 
 	return ret;
 }
