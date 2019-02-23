@@ -25,7 +25,8 @@ static inline int khook_arch_lde_get_length(const void *p) {
 #ifdef CONFIG_X86_64
 	x86_64 = 1;
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
+	khook_arch_lde.init(&insn, p, MAX_INSN_SIZE, x86_64);
+#if defined MAX_INSN_SIZE && (MAX_INSN_SIZE == 15) /* 3.19.7+ */
 	khook_arch_lde.init(&insn, p, MAX_INSN_SIZE, x86_64);
 #else
 	khook_arch_lde.init(&insn, p, x86_64);
