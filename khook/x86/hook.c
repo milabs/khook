@@ -43,12 +43,8 @@ static inline void x86_put_jmp(void *a, void *f, void *t)
 	*(( int *)(a + 1)) = (long)(t - (f + 5));
 }
 
-static const char stub_template[] = {
-#ifdef CONFIG_X86_64
-# include "stub.inc"
-#else
-# include "stub32.inc"
-#endif
+static const char khook_stub_template[] = {
+# include KHOOK_STUB_FILE_NAME
 };
 
 static inline void stub_fixup(void *stub, const void *value) {
@@ -61,8 +57,8 @@ static inline void khook_arch_sm_init_one(khook_t *hook) {
 	if (hook->target.addr[0] == 0xE9 ||
 	    hook->target.addr[0] == 0xCC) return;
 
-	BUILD_BUG_ON(sizeof(stub_template) > offsetof(khook_stub_t, nbytes));
-	memcpy((void *)stub, stub_template, sizeof(stub_template));
+	BUILD_BUG_ON(sizeof(khook_stub_template) > offsetof(khook_stub_t, nbytes));
+	memcpy(stub, khook_stub_template, sizeof(khook_stub_template));
 	stub_fixup(stub->hook, hook->fn);
 
 	while (stub->nbytes < 5)

@@ -4,7 +4,7 @@ static khook_stub_t *khook_stub_tbl = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static int khook_lookup_cb(unsigned long data[], const char *name, void *module, unsigned long addr)
+static int khook_lookup_cb(long data[], const char *name, void *module, long addr)
 {
 	int i = 0; while (!module && (((const char *)data[0]))[i] == name[i]) {
 		if (!name[i++]) return !!(data[1] = addr);
@@ -13,7 +13,7 @@ static int khook_lookup_cb(unsigned long data[], const char *name, void *module,
 
 static void *khook_lookup_name(const char *name)
 {
-	unsigned long data[2] = { (unsigned long)name, 0 };
+	long data[2] = { (long)name, 0 };
 	kallsyms_on_each_symbol((void *)khook_lookup_cb, data);
 	return (void *)data[1];
 }
@@ -22,11 +22,11 @@ static void *khook_map_writable(void *addr, size_t len)
 {
 	int i;
 	void *vaddr = NULL;
-	void *paddr = (void *)((unsigned long)addr & PAGE_MASK);
+	void *paddr = (void *)((long)addr & PAGE_MASK);
 	struct page *pages[ DIV_ROUND_UP(offset_in_page(addr) + len, PAGE_SIZE) ];
 
 	for (i = 0; i < ARRAY_SIZE(pages); i++, paddr += PAGE_SIZE) {
-		if ((pages[i] = __module_address((unsigned long)paddr) ?
+		if ((pages[i] = __module_address((long)paddr) ?
 		     vmalloc_to_page(paddr) : virt_to_page(paddr)) == NULL)
 			return NULL;
 	}
@@ -103,7 +103,7 @@ static void khook_unmap(int wait)
 			msleep_interruptible(1000);
 			stop_machine(khook_sm_wakeup, NULL, NULL);
 		}
-		vunmap((void *)((unsigned long)p->target.addr_map & PAGE_MASK));
+		vunmap((void *)((long)p->target.addr_map & PAGE_MASK));
 		p->target.addr_map = NULL;
 	}
 }
@@ -112,7 +112,7 @@ static void khook_unmap(int wait)
 
 int khook_init(void)
 {
-	void *(*malloc)(unsigned long size) = NULL;
+	void *(*malloc)(long size) = NULL;
 
 	malloc = khook_lookup_name("module_alloc");
 	if (!malloc || KHOOK_ARCH_INIT()) return -EINVAL;

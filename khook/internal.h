@@ -46,5 +46,11 @@ static khook_stub_t *khook_stub_tbl;
 #define KHOOK_STUB_TBL_SIZE						\
 	(sizeof(khook_stub_t) * (__khook_tbl_end - __khook_tbl + 1))
 
+#if BITS_PER_LONG == 64
+# define KHOOK_STUB_FILE_NAME "stub.inc"
+#else
+# define KHOOK_STUB_FILE_NAME "stub32.inc"
+#endif
+
 #define khook_debug(fmt, ...)		\
 	pr_debug("[khook] " fmt, ##__VA_ARGS__)

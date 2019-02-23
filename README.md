@@ -9,7 +9,7 @@ Include KHOOK engine:
 #include "khook/engine.c"
 ~~~
 
-Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine properly.
+Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine.
 
 # Examples
 
@@ -53,4 +53,4 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 
 [Ilya V. Matveychikov](https://github.com/milabs)
 
-2018
+2018, 2019
