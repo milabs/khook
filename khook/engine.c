@@ -20,19 +20,19 @@ static void *khook_lookup_name(const char *name)
 
 static void *khook_map_writable(void *addr, size_t len)
 {
-	int i;
-	void *vaddr = NULL;
-	void *paddr = (void *)((long)addr & PAGE_MASK);
-	struct page *pages[ DIV_ROUND_UP(offset_in_page(addr) + len, PAGE_SIZE) ];
+	struct page *pages[2] = { 0 }; // len << PAGE_SIZE
+	long page_offset = offset_in_page(addr);
+	int i, nb_pages = DIV_ROUND_UP(page_offset + len, PAGE_SIZE);
 
-	for (i = 0; i < ARRAY_SIZE(pages); i++, paddr += PAGE_SIZE) {
-		if ((pages[i] = ((long)paddr > MODULES_VADDR) ?
-		     vmalloc_to_page(paddr) : virt_to_page(paddr)) == NULL)
+	addr = (void *)((long)addr & PAGE_MASK);
+	for (i = 0; i < nb_pages; i++, addr += PAGE_SIZE) {
+		if ((pages[i] = is_vmalloc_addr(addr) ?
+		     vmalloc_to_page(addr) : virt_to_page(addr)) == NULL)
 			return NULL;
 	}
 
-	vaddr = vmap(pages, ARRAY_SIZE(pages), VM_MAP, PAGE_KERNEL);
-	return vaddr ? vaddr + offset_in_page(addr) : NULL;
+	addr = vmap(pages, nb_pages, VM_MAP, PAGE_KERNEL);
+	return addr ? addr + page_offset : NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
