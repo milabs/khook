@@ -19,12 +19,10 @@ An example of hooking of kernel function with known prototype (function is defin
 KHOOK(inode_permission);
 static int khook_inode_permission(struct inode *inode, int mask)
 {
-	int ret = 0;
-
-	ret = KHOOK_ORIGIN(inode_permission, inode, mask);
-	printk("%s(%p, %08x) = %d\n", __func__, inode, mask, ret);
-
-	return ret;
+        int ret = 0;
+        ret = KHOOK_ORIGIN(inode_permission, inode, mask);
+        printk("%s(%p, %08x) = %d\n", __func__, inode, mask, ret);
+        return ret;
 }
 ~~~
 
@@ -34,12 +32,10 @@ An example of hooking of kernel function with custom prototype (function is not 
 KHOOK_EXT(int, load_elf_binary, struct linux_binprm *);
 static int khook_load_elf_binary(struct linux_binprm *bprm)
 {
-	int ret = 0;
-
-	ret = KHOOK_ORIGIN(load_elf_binary, bprm);
-	printk("%s(%p) = %d\n", __func__, bprm, ret);
-
-	return ret;
+        int ret = 0;
+        ret = KHOOK_ORIGIN(load_elf_binary, bprm);
+        printk("%s(%p) = %d\n", __func__, bprm, ret);
+        return ret;
 }
 ~~~
 
@@ -62,7 +58,7 @@ CALLER
             `--------(2)-'
 ~~~
 
-The diagram below illustrates the call to function `X` when `KHOOK` is used: 
+The diagram below illustrates the call to function `X` when `KHOOK` is used:
 
 ~~~
 CALLER
