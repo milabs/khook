@@ -79,7 +79,6 @@ static void khook_resolve(void)
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
 		p->target.addr = khook_lookup_name(p->target.name);
-		khook_debug("target %s@%p\n", p->target.name, p->target.addr);
 	}
 }
 
@@ -102,6 +101,7 @@ static void khook_unmap(int wait)
 		while (wait && atomic_read(&stub->use_count) > 0) {
 			msleep_interruptible(1000);
 			stop_machine(khook_sm_wakeup, NULL, NULL);
+			khook_debug("waiting for %s...\n", p->target.name);
 		}
 		vunmap((void *)((long)p->target.addr_map & PAGE_MASK));
 		p->target.addr_map = NULL;
