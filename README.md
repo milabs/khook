@@ -68,7 +68,7 @@ The diagram below illustrates the call to function `X` when `KHOOK` is used:
 CALLER
 | ...
 | CALL X -(1)---> X
-| ...  <----.     | JUMP -(2)-----> STUB.hook
+| ...  <----.     | JUMP -(2)----> STUB.hook
 ` RET       |     | ???            | INCR use_count
             |     | ...  <----.    | CALL handler -(3)------> HOOK.fn
             |     | ...       |    | DECR use_count <----.    | ...
