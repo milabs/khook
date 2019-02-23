@@ -26,7 +26,7 @@ static void *khook_map_writable(void *addr, size_t len)
 	struct page *pages[ DIV_ROUND_UP(offset_in_page(addr) + len, PAGE_SIZE) ];
 
 	for (i = 0; i < ARRAY_SIZE(pages); i++, paddr += PAGE_SIZE) {
-		if ((pages[i] = __module_address((long)paddr) ?
+		if ((pages[i] = ((long)paddr > MODULES_VADDR) ?
 		     vmalloc_to_page(paddr) : virt_to_page(paddr)) == NULL)
 			return NULL;
 	}

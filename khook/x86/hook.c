@@ -25,7 +25,6 @@ static inline int khook_arch_lde_get_length(const void *p) {
 #ifdef CONFIG_X86_64
 	x86_64 = 1;
 #endif
-	khook_arch_lde.init(&insn, p, MAX_INSN_SIZE, x86_64);
 #if defined MAX_INSN_SIZE && (MAX_INSN_SIZE == 15) /* 3.19.7+ */
 	khook_arch_lde.init(&insn, p, MAX_INSN_SIZE, x86_64);
 #else
@@ -55,8 +54,8 @@ static inline void stub_fixup(void *stub, const void *value) {
 
 static inline void khook_arch_sm_init_one(khook_t *hook) {
 	khook_stub_t *stub = KHOOK_STUB(hook);
-	if (hook->target.addr[0] == 0xE9 ||
-	    hook->target.addr[0] == 0xCC) return;
+	if (hook->target.addr[0] == (char)0xE9 ||
+	    hook->target.addr[0] == (char)0xCC) return;
 
 	BUILD_BUG_ON(sizeof(khook_stub_template) > offsetof(khook_stub_t, nbytes));
 	memcpy(stub, khook_stub_template, sizeof(khook_stub_template));
