@@ -49,6 +49,37 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 - 2.6.33+ kernels
 - use of in-kernel length disassembler
 
+# How it works?
+
+The diagram below illustrates the call to function `X` without hooking:
+
+~~~
+CALLER
+| ...
+| CALL X -(1)---> X
+| ...  <----.     | ...
+` RET       |     ` RET -.
+            `--------(2)-'
+~~~
+
+The diagram below illustrates the call to function `X` when `KHOOK` is used: 
+
+~~~
+CALLER
+| ...
+| CALL X -(1)---> X
+| ...  <----.     | JUMP -(2)-----> STUB.hook
+` RET       |     | ???            | INCR use_count
+            |     | ...  <----.    | CALL handler -(3)------> HOOK.fn
+            |     | ...       |    | DECR use_count <----.    | ...
+            |     ` RET -.    |    ` RET -.              |    | CALL origin -(4)------> STUB.orig
+            |            |    |           |              |    | ...  <----.             | N bytes of X
+            |            |    |           |              |    ` RET -.    |             ` JMP X + N -.
+            `------------|----|-------(8)-'              '-------(7)-'    |                          |
+                         |    `-------------------------------------------|----------------------(5)-'
+                         `-(6)--------------------------------------------'
+~~~
+
 # Author
 
 [Ilya V. Matveychikov](https://github.com/milabs)
