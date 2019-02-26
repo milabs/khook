@@ -76,6 +76,10 @@ CALLER
                          `-(6)--------------------------------------------'
 ~~~
 
+# License
+
+This software is lecensed under the GPL.
+
 # Author
 
 [Ilya V. Matveychikov](https://github.com/milabs)
