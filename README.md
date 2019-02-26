@@ -1,6 +1,6 @@
 # 0
 
-KHOOK - Linux Kernel hooking engine.
+KHOOK (خوک) - Linux Kernel hooking engine.
 
 # Usage
 
