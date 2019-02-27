@@ -9,6 +9,11 @@ Include KHOOK engine:
 #include "khook/engine.c"
 ~~~
 
+Add the following line to the KBuild/Makefile:
+~~~
+ldflags-y += -T$(src)/khook/engine.lds
+~~~
+
 Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine.
 
 # Examples
