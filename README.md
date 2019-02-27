@@ -78,7 +78,7 @@ CALLER
 
 # License
 
-This software is lecensed under the GPL.
+This software is licensed under the GPL.
 
 # Author
 
