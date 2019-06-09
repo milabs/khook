@@ -45,13 +45,14 @@ static void *khook_map_writable(void *addr, size_t len)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static int khook_sm_wakeup(void *arg)
+static void khook_wakeup(void)
 {
 	struct task_struct *p;
+	rcu_read_lock();
 	for_each_process(p) {
 		wake_up_process(p);
 	}
-	return 0;
+	rcu_read_unlock();
 }
 
 static int khook_sm_init_hooks(void *arg)
@@ -99,8 +100,8 @@ static void khook_unmap(int wait)
 		khook_stub_t *stub = KHOOK_STUB(p);
 		if (!p->target.addr_map) continue;
 		while (wait && atomic_read(&stub->use_count) > 0) {
+			khook_wakeup();
 			msleep_interruptible(1000);
-			stop_machine(khook_sm_wakeup, NULL, NULL);
 			khook_debug("waiting for %s...\n", p->target.name);
 		}
 		vunmap((void *)((long)p->target.addr_map & PAGE_MASK));
