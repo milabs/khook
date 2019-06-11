@@ -18,7 +18,9 @@ Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking 
 
 # Examples
 
-An example of hooking of kernel function with known prototype (function is defined in `linux/fs.h`):
+## Hooking of generic kernel functions 
+
+An example of hooking a kernel function with known prototype (function is defined in `linux/fs.h`):
 ~~~
 #include <linux/fs.h> // has inode_permission() proto
 KHOOK(inode_permission);
@@ -31,7 +33,7 @@ static int khook_inode_permission(struct inode *inode, int mask)
 }
 ~~~
 
-An example of hooking of kernel function with custom prototype (function is not defined in `linux/binfmts.h`):
+An example of hooking a kernel function with custom prototype (function is not defined in `linux/binfmts.h`):
 ~~~
 #include <linux/binfmts.h> // has no load_elf_binary() proto
 KHOOK_EXT(int, load_elf_binary, struct linux_binprm *);
@@ -43,6 +45,26 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
         return ret;
 }
 ~~~
+
+Starting from [a6e7f394](https://github.com/milabs/khook/commit/a6e7f3945a4eebb811818f62bd2cf2ea50f609c0) it's possible to hook a function with big amount of arguments. This requires for `KHOOK` to make a local copy of N (hardcoded as 8) arguments which are passed through the stack before calling the handler function.
+
+An example of hooking 12 argument function `scsi_execute` is shown below (see [#5](/../../issues/5) for details):
+
+~~~
+
+#include <scsi/scsi_device.h>
+KHOOK(scsi_execute);
+static int khook_scsi_execute(struct scsi_device *sdev, const unsigned char *cmd, int data_direction, void *buffer, unsigned bufflen, unsigned char *sense, struct scsi_sense_hdr *sshdr, int timeout, int retries, u64 flags, req_flags_t rq_flags, int *resid)
+{
+        int ret = 0;
+        ret = KHOOK_ORIGIN(scsi_execute, sdev, cmd, data_direction, buffer, bufflen, sense, sshdr, timeout, retries, flags, rq_flags, resid);
+        printk("%s(%lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx, %lx) = %d\n", __func__, (long)sdev, (long)cmd, (long)data_direction, (long)buffer, (long)bufflen, (long)sense, (long)sshdr, (long)timeout, (long)retries, (long)flags, (long)rq_flags, (long)resid ,ret);
+        return ret;
+}
+
+~~~
+
+## Hooking of system calls (handler functions)
 
 An example of hooking `kill(2)` system call handler (see [#3](/../../issues/3) for the details):
 ~~~
@@ -60,7 +82,6 @@ static long khook___x64_sys_kill(const struct pt_regs *regs) {
         return KHOOK_ORIGIN(__x64_sys_kill, regs);
 }
 ~~~
-
 
 # Features
 
