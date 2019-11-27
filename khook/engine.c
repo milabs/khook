@@ -114,6 +114,7 @@ static void khook_unmap(int wait)
 int khook_init(void)
 {
 	void *(*malloc)(long size) = NULL;
+	int   (*set_memory_x)(unsigned long, int) = NULL;
 
 	malloc = khook_lookup_name("module_alloc");
 	if (!malloc || KHOOK_ARCH_INIT()) return -EINVAL;
@@ -121,6 +122,18 @@ int khook_init(void)
 	khook_stub_tbl = malloc(KHOOK_STUB_TBL_SIZE);
 	if (!khook_stub_tbl) return -ENOMEM;
 	memset(khook_stub_tbl, 0, KHOOK_STUB_TBL_SIZE);
+
+	//
+	// Since some point memory allocated by module_alloc() doesn't
+	// have eXecutable attributes. That's why we have to mark the
+	// region executable explicitly.
+	//
+
+	set_memory_x = khook_lookup_name("set_memory_x");
+	if (set_memory_x) {
+		int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
+		set_memory_x((unsigned long)khook_stub_tbl, numpages);
+	}
 
 	khook_resolve();
 
