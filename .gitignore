@@ -1,8 +1,10 @@
+*.a
 *.o
 *.o.*
 *.ko
 *.ko.unsigned
 *.cmd
+*.mod
 *.mod.c
 *.order
 *.symvers

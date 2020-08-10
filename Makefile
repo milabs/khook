@@ -1,4 +1,6 @@
+KDIR ?= /lib/modules/$(shell uname -r)/build
+
 all:
-	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$$PWD
+	$(MAKE) -C $(KDIR) M=$$PWD
 clean:
-	$(MAKE) -C /lib/modules/$(shell uname -r)/build M=$$PWD clean
+	$(MAKE) -C $(KDIR) M=$$PWD clean
