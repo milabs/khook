@@ -32,7 +32,7 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 	int ret = 0;
 
 	ret = KHOOK_ORIGIN(load_elf_binary, bprm);
-	printk("%s(%p) = %d\n", __func__, bprm, ret);
+	printk("%s(%p) = %d (%s)\n", __func__, bprm, ret, bprm->filename);
 
 	return ret;
 }
