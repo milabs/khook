@@ -1,6 +1,7 @@
 #pragma once
 
 #include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <linux/kallsyms.h>
 #include <linux/stop_machine.h>
 #include <linux/delay.h>
@@ -13,6 +14,10 @@
 
 #ifndef for_each_process
 # include <linux/sched/signal.h>
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+# define stop_machine_run stop_machine
 #endif
 
 #include "engine.h"

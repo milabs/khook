@@ -4,12 +4,13 @@ static khook_stub_t *khook_stub_tbl = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static long lookupName = 0;
+module_param(lookupName, long, 0);
+
 unsigned long khook_lookup_name(const char *name)
 {
 	static typeof(khook_lookup_name) *lookup_name = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
-	lookup_name = &kallsyms_lookup_name;
-#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30)
 	if (NULL == lookup_name) {
 		int callback(long data[], const char *name, void *module, long addr) {
 			if (!module && !strcmp(name, "kallsyms_lookup_name")) {
@@ -20,10 +21,11 @@ unsigned long khook_lookup_name(const char *name)
 #endif
 #ifdef CONFIG_KPROBES
 	if (NULL == lookup_name) {
-		struct kprobe probe = { 0 };
+		struct kprobe probe;
 		int callback(struct kprobe *p, struct pt_regs *regs) {
 			return 0;
 		}
+		memset(&probe, 0, sizeof(probe));
 		probe.pre_handler = callback;
 		probe.symbol_name = "kallsyms_lookup_name";
 		if (!register_kprobe(&probe)) {
@@ -32,6 +34,8 @@ unsigned long khook_lookup_name(const char *name)
 		}
 	}
 #endif
+	if (NULL == lookup_name)
+		lookup_name = (void *)lookupName;
 	return lookup_name ? lookup_name(name) : 0;
 }
 
@@ -126,13 +130,13 @@ int khook_init(void)
 	}
 
 	khook_resolve();
-	stop_machine(khook_sm_init_hooks, NULL, NULL);
+	stop_machine_run(khook_sm_init_hooks, NULL, 0);
 
 	return 0;
 }
 
 void khook_cleanup(void)
 {
-	stop_machine(khook_sm_cleanup_hooks, NULL, NULL);
+	stop_machine_run(khook_sm_cleanup_hooks, NULL, 0);
 	khook_release();
 }
