@@ -11,7 +11,7 @@ Include KHOOK engine:
 
 Add the following line to the KBuild/Makefile:
 ~~~
-ldflags-y += -T$(src)/khook/engine.lds
+ldflags-y += -T$(src)/khook/engine.lds (use LDFLAGS for old kernels)
 ~~~
 
 Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine.
@@ -41,7 +41,7 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 {
         int ret = 0;
         ret = KHOOK_ORIGIN(load_elf_binary, bprm);
-        printk("%s(%p) = %d\n", __func__, bprm, ret);
+        printk("%s(%p) = %d (%s)\n", __func__, bprm, ret, bprm->filename);
         return ret;
 }
 ~~~
@@ -112,11 +112,11 @@ CALLER
 ` RET       |     | ???            | INCR use_count
             |     | ...  <----.    | CALL handler -(3)------> HOOK.fn
             |     | ...       |    | DECR use_count <----.    | ...
-            |     ` RET -.    |    ` RET -.              |    | CALL origin -(4)------> STUB.orig
-            |            |    |           |              |    | ...  <----.             | N bytes of X
-            |            |    |           |              |    ` RET -.    |             ` JMP X + N -.
-            `------------|----|-------(8)-'              '-------(7)-'    |                          |
-                         |    `-------------------------------------------|----------------------(5)-'
+            |     ` RET -.    |    ` RET -.              |    | CALL origin -(4)-----> STUB.orig
+            |            |    |           |              |    | ...  <----.            | N bytes of X
+            |            |    |           |              |    ` RET -.    |            ` JMP X + N -.
+            `------------|----|-------(8)-'              '-------(7)-'    |                         |
+                         |    `-------------------------------------------|---------------------(5)-'
                          `-(6)--------------------------------------------'
 ~~~
 
@@ -128,4 +128,4 @@ This software is licensed under the GPL.
 
 [Ilya V. Matveychikov](https://github.com/milabs)
 
-2018, 2019
+2018, 2019, 2020
