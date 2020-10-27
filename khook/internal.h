@@ -1,7 +1,6 @@
 #pragma once
 
 #include <linux/mm.h>
-#include <linux/vmalloc.h>
 #include <linux/kallsyms.h>
 #include <linux/stop_machine.h>
 #include <linux/delay.h>
@@ -50,11 +49,4 @@ static khook_stub_t *khook_stub_tbl;
 # define KHOOK_STUB_FILE_NAME "stub.inc"
 #else
 # define KHOOK_STUB_FILE_NAME "stub32.inc"
-#endif
-
-#ifdef DEBUG
-# define khook_debug(fmt, ...)		\
-	pr_debug("[khook] " fmt, ##__VA_ARGS__)
-#else
-# define khook_debug(fmt, ...)
 #endif

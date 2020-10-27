@@ -18,23 +18,6 @@ static void *khook_lookup_name(const char *name)
 	return (void *)data[1];
 }
 
-static void *khook_map_writable(void *addr, size_t len)
-{
-	struct page *pages[2] = { 0 }; // len << PAGE_SIZE
-	long page_offset = offset_in_page(addr);
-	int i, nb_pages = DIV_ROUND_UP(page_offset + len, PAGE_SIZE);
-
-	addr = (void *)((long)addr & PAGE_MASK);
-	for (i = 0; i < nb_pages; i++, addr += PAGE_SIZE) {
-		if ((pages[i] = is_vmalloc_addr(addr) ?
-		     vmalloc_to_page(addr) : virt_to_page(addr)) == NULL)
-			return NULL;
-	}
-
-	addr = vmap(pages, nb_pages, VM_MAP, PAGE_KERNEL);
-	return addr ? addr + page_offset : NULL;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef CONFIG_X86
@@ -59,7 +42,7 @@ static int khook_sm_init_hooks(void *arg)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
-		if (!p->target.addr_map) continue;
+		if (!p->target.addr) continue;
 		khook_arch_sm_init_one(p);
 	}
 	return 0;
@@ -69,7 +52,7 @@ static int khook_sm_cleanup_hooks(void *arg)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
-		if (!p->target.addr_map) continue;
+		if (!p->target.addr) continue;
 		khook_arch_sm_cleanup_one(p);
 	}
 	return 0;
@@ -80,33 +63,23 @@ static void khook_resolve(void)
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
 		p->target.addr = khook_lookup_name(p->target.name);
+		if (!p->target.addr) printk("khook: failed to lookup %s symbol\n", p->target.name);
 	}
 }
 
-static void khook_map(void)
-{
-	khook_t *p;
-	KHOOK_FOREACH_HOOK(p) {
-		if (!p->target.addr) continue;
-		p->target.addr_map = khook_map_writable(p->target.addr, 32);
-		khook_debug("target %s@%p -> %p\n", p->target.name, p->target.addr, p->target.addr_map);
-	}
-}
-
-static void khook_unmap(int wait)
+static void khook_release(void)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
 		khook_stub_t *stub = KHOOK_STUB(p);
-		if (!p->target.addr_map) continue;
-		while (wait && atomic_read(&stub->use_count) > 0) {
+		if (!p->target.addr) continue;
+		while (atomic_read(&stub->use_count) > 0) {
 			khook_wakeup();
 			msleep_interruptible(1000);
-			khook_debug("waiting for %s...\n", p->target.name);
+			printk("khook: waiting for %s...\n", p->target.name);
 		}
-		vunmap((void *)((long)p->target.addr_map & PAGE_MASK));
-		p->target.addr_map = NULL;
 	}
+	vfree(khook_stub_tbl);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -136,18 +109,13 @@ int khook_init(void)
 	}
 
 	khook_resolve();
-
-	khook_map();
 	stop_machine(khook_sm_init_hooks, NULL, NULL);
-	khook_unmap(0);
 
 	return 0;
 }
 
 void khook_cleanup(void)
 {
-	khook_map();
 	stop_machine(khook_sm_cleanup_hooks, NULL, NULL);
-	khook_unmap(1);
-	vfree(khook_stub_tbl);
+	khook_release();
 }

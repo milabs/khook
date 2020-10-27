@@ -1,5 +1,19 @@
 #include "../internal.h"
 
+#define kernel_write_enter() asm volatile (	\
+	"cli\n\t"				\
+	"mov %%cr0, %%rax\n\t"			\
+	"and $0xfffffffffffeffff, %%rax\n\t"	\
+	"mov %%rax, %%cr0\n\t"			\
+	::: "%rax" )
+
+#define kernel_write_leave() asm volatile (	\
+	"mov %%cr0, %%rax\n\t"			\
+	"or $0x0000000000010000, %%rax\n\t"	\
+	"mov %%rax, %%cr0\n\t"			\
+	"sti\n\t"				\
+	::: "%rax" )
+
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,17 +80,22 @@ static inline void khook_arch_sm_init_one(khook_t *hook) {
 
 	memcpy(stub->orig, hook->target.addr, stub->nbytes);
 	x86_put_jmp(stub->orig + stub->nbytes, stub->orig + stub->nbytes, hook->target.addr + stub->nbytes);
+	kernel_write_enter();
 	if (hook->flags & KHOOK_F_NOREF) {
-		x86_put_jmp(hook->target.addr_map, hook->target.addr, hook->fn);
+		x86_put_jmp(hook->target.addr, hook->target.addr, hook->fn);
 	} else {
-		x86_put_jmp(hook->target.addr_map, hook->target.addr, stub->hook);
+		x86_put_jmp(hook->target.addr, hook->target.addr, stub->hook);
 	}
+	kernel_write_leave();
+
 	hook->orig = stub->orig; // the only link from hook to stub
 }
 
 static inline void khook_arch_sm_cleanup_one(khook_t *hook) {
 	khook_stub_t *stub = KHOOK_STUB(hook);
-	memcpy(hook->target.addr_map, stub->orig, stub->nbytes);
+	kernel_write_enter();
+	memcpy(hook->target.addr, stub->orig, stub->nbytes);
+	kernel_write_leave();
 }
 
 #define KHOOK_ARCH_INIT(...)					\

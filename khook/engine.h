@@ -9,7 +9,6 @@ typedef struct {
 	struct {
 		const char	*name;		// target symbol name
 		char		*addr;		// target symbol addr (see khook_lookup_name)
-		char		*addr_map;	// writable mapping of target symbol
 	} target;
 	void			*orig;		// original fn call wrapper
 	unsigned long		flags;		// hook engine options (flags)
