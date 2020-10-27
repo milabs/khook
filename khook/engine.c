@@ -4,18 +4,35 @@ static khook_stub_t *khook_stub_tbl = NULL;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static int khook_lookup_cb(long data[], const char *name, void *module, long addr)
+unsigned long khook_lookup_name(const char *name)
 {
-	int i = 0; while (!module && (((const char *)data[0]))[i] == name[i]) {
-		if (!name[i++]) return !!(data[1] = addr);
-	} return 0;
-}
-
-static void *khook_lookup_name(const char *name)
-{
-	long data[2] = { (long)name, 0 };
-	kallsyms_on_each_symbol((void *)khook_lookup_cb, data);
-	return (void *)data[1];
+	static typeof(khook_lookup_name) *lookup_name = NULL;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 30)
+	lookup_name = &kallsyms_lookup_name;
+#else
+	if (NULL == lookup_name) {
+		int callback(long data[], const char *name, void *module, long addr) {
+			if (!module && !strcmp(name, "kallsyms_lookup_name")) {
+				return !!(data[0] = addr);
+			} return 0;
+		} kallsyms_on_each_symbol((void *)callback, &lookup_name);
+	}
+#endif
+#ifdef CONFIG_KPROBES
+	if (NULL == lookup_name) {
+		struct kprobe probe = { 0 };
+		int callback(struct kprobe *p, struct pt_regs *regs) {
+			return 0;
+		}
+		probe.pre_handler = callback;
+		probe.symbol_name = "kallsyms_lookup_name";
+		if (!register_kprobe(&probe)) {
+			lookup_name = (void *)probe.addr;
+			unregister_kprobe(&probe);
+		}
+	}
+#endif
+	return lookup_name ? lookup_name(name) : 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +79,7 @@ static void khook_resolve(void)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
-		p->target.addr = khook_lookup_name(p->target.name);
+		p->target.addr = (void *)khook_lookup_name(p->target.name);
 		if (!p->target.addr) printk("khook: failed to lookup %s symbol\n", p->target.name);
 	}
 }
@@ -89,7 +106,7 @@ int khook_init(void)
 	void *(*malloc)(long size) = NULL;
 	int   (*set_memory_x)(unsigned long, int) = NULL;
 
-	malloc = khook_lookup_name("module_alloc");
+	malloc = (void *)khook_lookup_name("module_alloc");
 	if (!malloc || KHOOK_ARCH_INIT()) return -EINVAL;
 
 	khook_stub_tbl = malloc(KHOOK_STUB_TBL_SIZE);
@@ -102,7 +119,7 @@ int khook_init(void)
 	// region executable explicitly.
 	//
 
-	set_memory_x = khook_lookup_name("set_memory_x");
+	set_memory_x = (void *)khook_lookup_name("set_memory_x");
 	if (set_memory_x) {
 		int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
 		set_memory_x((unsigned long)khook_stub_tbl, numpages);

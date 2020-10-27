@@ -7,6 +7,10 @@
 #include <linux/version.h>
 #include <linux/sched.h>
 
+#ifdef CONFIG_KPROBES
+# include <linux/kprobes.h>
+#endif
+
 #ifndef for_each_process
 # include <linux/sched/signal.h>
 #endif
