@@ -17,7 +17,9 @@
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
-# define stop_machine_run stop_machine
+# define stop_machine stop_machine
+#else
+# define stop_machine stop_machine_run
 #endif
 
 #include "engine.h"

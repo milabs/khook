@@ -130,13 +130,13 @@ int khook_init(void)
 	}
 
 	khook_resolve();
-	stop_machine_run(khook_sm_init_hooks, NULL, 0);
+	stop_machine(khook_sm_init_hooks, NULL, 0);
 
 	return 0;
 }
 
 void khook_cleanup(void)
 {
-	stop_machine_run(khook_sm_cleanup_hooks, NULL, 0);
+	stop_machine(khook_sm_cleanup_hooks, NULL, 0);
 	khook_release();
 }
