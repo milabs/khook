@@ -7,18 +7,12 @@ static khook_stub_t *khook_stub_tbl = NULL;
 static long lookupName = 0;
 module_param(lookupName, long, 0);
 
+// kernel module loader STB_WEAK binding hack
+extern __attribute__((weak)) unsigned long kallsyms_lookup_name(const char *);
+
 unsigned long khook_lookup_name(const char *name)
 {
-	static typeof(khook_lookup_name) *lookup_name = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30)
-	if (NULL == lookup_name) {
-		int callback(long data[], const char *name, void *module, long addr) {
-			if (!module && !strcmp(name, "kallsyms_lookup_name")) {
-				return !!(data[0] = addr);
-			} return 0;
-		} kallsyms_on_each_symbol((void *)callback, &lookup_name);
-	}
-#endif
+	static typeof(khook_lookup_name) *lookup_name = kallsyms_lookup_name;
 #ifdef CONFIG_KPROBES
 	if (NULL == lookup_name) {
 		struct kprobe probe;
