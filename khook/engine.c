@@ -94,6 +94,9 @@ static void khook_release(void)
 			printk("khook: waiting for %s...\n", p->target.name);
 		}
 	}
+#ifdef USE_PTE_FAM
+	set_addr_nx( khook_stub_tbl );
+#endif
 	vfree(khook_stub_tbl);
 }
 
@@ -102,7 +105,10 @@ static void khook_release(void)
 int khook_init(void)
 {
 	void *(*malloc)(long size) = NULL;
+#ifdef USE_CR0_FAM
 	int   (*set_memory_x)(unsigned long, int) = NULL;
+#endif
+	int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
 
 	malloc = (void *)khook_lookup_name("module_alloc");
 	if (!malloc || KHOOK_ARCH_INIT()) return -EINVAL;
@@ -116,13 +122,16 @@ int khook_init(void)
 	// have eXecutable attributes. That's why we have to mark the
 	// region executable explicitly.
 	//
-
+#ifdef 	USE_CR0_FAM
 	set_memory_x = (void *)khook_lookup_name("set_memory_x");
-	if (set_memory_x) {
-		int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
+	if (set_memory_x)
 		set_memory_x((unsigned long)khook_stub_tbl, numpages);
-	}
-
+#endif
+#ifdef  USE_PTE_FAM
+	do {	/* Yes, I pass <= 100 symbol in one line limitation :) */
+		set_addr_ex((unsigned long)khook_stub_tbl + ((-1 + numpages--) * PAGE_SIZE) + 0x01);
+	} while ( numpages );
+#endif
 	khook_resolve();
 	stop_machine(khook_sm_init_hooks, NULL, 0);
 
@@ -133,4 +142,5 @@ void khook_cleanup(void)
 {
 	stop_machine(khook_sm_cleanup_hooks, NULL, 0);
 	khook_release();
+	
 }

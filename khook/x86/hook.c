@@ -1,22 +1,65 @@
 #include "../internal.h"
 
-#define kernel_write_enter() asm volatile (	\
+#define ASM_CLI asm volatile ("cli\n\t" ::: )
+#define ASM_STI asm volatile ("sti\n\t" ::: )
+
+#ifdef USE_CR0_FAM
+# define kernel_write_enter() asm volatile (	\
 	"cli\n\t"				\
 	"mov %%cr0, %%rax\n\t"			\
 	"and $0xfffffffffffeffff, %%rax\n\t"	\
 	"mov %%rax, %%cr0\n\t"			\
 	::: "%rax" )
 
-#define kernel_write_leave() asm volatile (	\
+# define kernel_write_leave() asm volatile (	\
 	"mov %%cr0, %%rax\n\t"			\
 	"or $0x0000000000010000, %%rax\n\t"	\
 	"mov %%rax, %%cr0\n\t"			\
 	"sti\n\t"				\
 	::: "%rax" )
-
+#endif
+#ifdef USE_PTE_FAM
+/*|PTE FAMILY|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*/
+/*|*/static void set_addr_rw(volatile void *addr){
+/*|*/   unsigned int level;
+/*|*/   uint64_t *pte = NULL;
+/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   if (pte[0x00] & ~((unsigned long long int)1<<1))
+/*|*/		pte[0x00] |= ((unsigned long long int)1<<1);
+/*|*/}
+/*|*/static void set_addr_ro(volatile void *addr){
+/*|*/   unsigned int level;
+/*|*/   uint64_t *pte = NULL;
+/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   pte[0x00] = pte[0x00] & ~((unsigned long long int)1<<1);
+/*|*/}
+/*|*/static void set_addr_ex(volatile uint64_t addr){
+/*|*/   unsigned int level;
+/*|*/   uint64_t *pte = NULL;
+/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   if (pte[0x00] & ((unsigned long long int)1<<63))
+/*|*/           pte[0x00] ^= ((unsigned long long int)1<<63);
+/*|*/   __asm__("cpuid  \n\t");
+/*|*/}
+/*|*/static void set_addr_nx(volatile void *addr){
+/*|*/   unsigned int level;
+/*|*/   uint64_t *pte = NULL;
+/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   if ( !(pte[0x00] & ((unsigned long long int)1<<63)))
+/*|*/           pte[0x00] ^= ((unsigned long long int)1<<63);
+/*|*/   __asm__("cpuid  \n\t");
+/*|*/}
+/*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*/
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
 ////////////////////////////////////////////////////////////////////////////////
+#endif
+
+#ifndef USE_CR0_FAM
+# ifndef USE_PTE_FAM
+#  error "At least one FAM *must* be used..."
+# endif
+#endif
 
 #include <asm/insn.h>
 
@@ -86,23 +129,50 @@ static inline void khook_arch_sm_init_one(khook_t *hook) {
 
 	memcpy(stub->orig, hook->target.addr, stub->nbytes);
 	x86_put_jmp(stub->orig + stub->nbytes, stub->orig + stub->nbytes, hook->target.addr + stub->nbytes);
+
+ASM_CLI;
+#ifdef USE_CR0_FAM
 	kernel_write_enter();
+#endif
+#ifdef USE_PTE_FAM
+	set_addr_rw( hook->target.addr );
+#endif
+
 	if (hook->flags & KHOOK_F_NOREF) {
 		x86_put_jmp(hook->target.addr, hook->target.addr, hook->fn);
 	} else {
 		x86_put_jmp(hook->target.addr, hook->target.addr, stub->hook);
 	}
-	kernel_write_leave();
+
+#ifdef USE_PTE_FAM
+        set_addr_ro( hook->target.addr );
+#endif
+#ifdef USE_CR0_FAM
+        kernel_write_leave();
+#endif
+ASM_STI;
 
 	hook->orig = stub->orig; // the only link from hook to stub
 }
 
 static inline void khook_arch_sm_cleanup_one(khook_t *hook) {
 	khook_stub_t *stub = KHOOK_STUB(hook);
-	kernel_write_enter();
+ASM_CLI;
+#ifdef USE_CR0_FAM
+        kernel_write_enter();
+#endif
+#ifdef USE_PTE_FAM
+        set_addr_rw( hook->target.addr );
+#endif
 	memcpy(hook->target.addr, stub->orig, stub->nbytes);
-	kernel_write_leave();
-}
+#ifdef USE_PTE_FAM
+        set_addr_ro( hook->target.addr );
+#endif
+#ifdef USE_CR0_FAM
+        kernel_write_leave();
+#endif
+ASM_STI;
+} /* Maybe, it will be better, if define two wrappers around both FAM's enter/leave ? */
 
 #define KHOOK_ARCH_INIT(...)					\
 	(khook_arch_lde_init())

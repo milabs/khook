@@ -83,11 +83,25 @@ static long khook___x64_sys_kill(const struct pt_regs *regs) {
 }
 ~~~
 
+## Memory mapping permitions 
+
+Before we patch kernel protected RO memory - we must deal with this protection. Or kernel crashes.
+To do this we can use cr0 register or PTE entry - both of them hardware feature.
+But, since our targets can be XEN - we can fails with cr0 method. 
+Anyway, you should try using it both.
+
+~~~
+#define USE_CR0_FAM USE_CR0_FAM
+#define USE_PTE_FAM USE_PTE_FAM
+~~~
+Comment to disable.
+
 # Features
 
 - x86 only
 - 2.6.33+ kernels
 - use of in-kernel length disassembler
++ switch CR0 or PTE memory hack method, or use both!
 
 # How it works?
 
