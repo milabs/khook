@@ -105,9 +105,7 @@ static void khook_release(void)
 int khook_init(void)
 {
 	void *(*malloc)(long size) = NULL;
-#ifdef USE_CR0_FAM
 	int   (*set_memory_x)(unsigned long, int) = NULL;
-#endif
 	int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
 
 	malloc = (void *)khook_lookup_name("module_alloc");
@@ -122,8 +120,8 @@ int khook_init(void)
 	// have eXecutable attributes. That's why we have to mark the
 	// region executable explicitly.
 	//
-#ifdef 	USE_CR0_FAM
 	set_memory_x = (void *)khook_lookup_name("set_memory_x");
+#ifdef  USE_CR0_FAM
 	if (set_memory_x)
 		set_memory_x((unsigned long)khook_stub_tbl, numpages);
 #endif

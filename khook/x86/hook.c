@@ -20,23 +20,23 @@
 #endif
 #ifdef USE_PTE_FAM
 /*|PTE FAMILY|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*/
-/*|*/static void set_addr_rw(volatile void *addr){
+/*|*/static void set_addr_rw(volatile uint64_t addr){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
-/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
 /*|*/   if (pte[0x00] & ~((unsigned long long int)1<<1))
 /*|*/		pte[0x00] |= ((unsigned long long int)1<<1);
 /*|*/}
-/*|*/static void set_addr_ro(volatile void *addr){
+/*|*/static void set_addr_ro(volatile uint64_t addr){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
-/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
 /*|*/   pte[0x00] = pte[0x00] & ~((unsigned long long int)1<<1);
 /*|*/}
 /*|*/static void set_addr_ex(volatile uint64_t addr){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
-/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
 /*|*/   if (pte[0x00] & ((unsigned long long int)1<<63))
 /*|*/           pte[0x00] ^= ((unsigned long long int)1<<63);
 /*|*/   __asm__("cpuid  \n\t");
@@ -44,7 +44,7 @@
 /*|*/static void set_addr_nx(volatile void *addr){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
-/*|*/	pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
+/*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
 /*|*/   if ( !(pte[0x00] & ((unsigned long long int)1<<63)))
 /*|*/           pte[0x00] ^= ((unsigned long long int)1<<63);
 /*|*/   __asm__("cpuid  \n\t");
@@ -60,6 +60,26 @@
 #  error "At least one FAM *must* be used..."
 # endif
 #endif
+
+#define MAKE_RW(addr) make_rw((uint64_t)addr)
+static void make_rw(uint64_t kaddr){
+	#ifdef USE_CR0_FAM
+	        kernel_write_enter();
+	#endif
+	#ifdef USE_PTE_FAM
+	        set_addr_rw( kaddr );
+	#endif
+}
+#define MAKE_RO(addr) make_ro((uint64_t)addr)
+static void make_ro(uint64_t kaddr){
+	#ifdef USE_PTE_FAM
+	        set_addr_ro( kaddr );
+	#endif
+	#ifdef USE_CR0_FAM
+	        kernel_write_leave();
+	#endif
+}
+
 
 #include <asm/insn.h>
 
@@ -130,13 +150,8 @@ static inline void khook_arch_sm_init_one(khook_t *hook) {
 	memcpy(stub->orig, hook->target.addr, stub->nbytes);
 	x86_put_jmp(stub->orig + stub->nbytes, stub->orig + stub->nbytes, hook->target.addr + stub->nbytes);
 
-ASM_CLI;
-#ifdef USE_CR0_FAM
-	kernel_write_enter();
-#endif
-#ifdef USE_PTE_FAM
-	set_addr_rw( hook->target.addr );
-#endif
+	ASM_CLI;
+	MAKE_RW(hook->target.addr);
 
 	if (hook->flags & KHOOK_F_NOREF) {
 		x86_put_jmp(hook->target.addr, hook->target.addr, hook->fn);
@@ -144,35 +159,22 @@ ASM_CLI;
 		x86_put_jmp(hook->target.addr, hook->target.addr, stub->hook);
 	}
 
-#ifdef USE_PTE_FAM
-        set_addr_ro( hook->target.addr );
-#endif
-#ifdef USE_CR0_FAM
-        kernel_write_leave();
-#endif
-ASM_STI;
+	MAKE_RO(hook->target.addr);
+	ASM_STI;
 
 	hook->orig = stub->orig; // the only link from hook to stub
 }
 
 static inline void khook_arch_sm_cleanup_one(khook_t *hook) {
 	khook_stub_t *stub = KHOOK_STUB(hook);
-ASM_CLI;
-#ifdef USE_CR0_FAM
-        kernel_write_enter();
-#endif
-#ifdef USE_PTE_FAM
-        set_addr_rw( hook->target.addr );
-#endif
+	ASM_CLI;
+	MAKE_RW(hook->target.addr);
+
 	memcpy(hook->target.addr, stub->orig, stub->nbytes);
-#ifdef USE_PTE_FAM
-        set_addr_ro( hook->target.addr );
-#endif
-#ifdef USE_CR0_FAM
-        kernel_write_leave();
-#endif
-ASM_STI;
-} /* Maybe, it will be better, if define two wrappers around both FAM's enter/leave ? */
+
+	MAKE_RO(hook->target.addr);
+	ASM_STI;
+}
 
 #define KHOOK_ARCH_INIT(...)					\
 	(khook_arch_lde_init())
