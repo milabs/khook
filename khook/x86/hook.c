@@ -79,6 +79,7 @@ static volatile int lock_pte = 0x00;
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
 ////////////////////////////////////////////////////////////////////////////////
+#endif /* USE_PTE_FAM */
 
 #define MAKE_RW(addr) make_rw((uint64_t)addr)
 static void make_rw(uint64_t kaddr){
@@ -106,9 +107,6 @@ static void make_ro(uint64_t kaddr){
 	        kernel_write_leave();
 	#endif
 }
-
-#endif /* USE_PTE_FAM */
-
 
 #include <asm/insn.h>
 
