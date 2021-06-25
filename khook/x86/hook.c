@@ -3,6 +3,12 @@
 #define ASM_CLI asm volatile ("cli\n\t" ::: )
 #define ASM_STI asm volatile ("sti\n\t" ::: )
 
+#ifndef USE_CR0_FAM
+# ifndef USE_PTE_FAM
+#  error "At least one FAM *must* be used..."
+# endif
+#endif
+
 #ifdef USE_CR0_FAM
 # define kernel_write_enter() asm volatile (	\
 	"cli\n\t"				\
@@ -19,19 +25,39 @@
 	::: "%rax" )
 #endif
 #ifdef USE_PTE_FAM
+/* Because of syncronization mechanism
+ * this set_rw/set_ro can be used only pairy
+ * and should be used in small time window
+ **/
+static int
+	is_first_rw = 0x00,
+	is_last_rw = 0x00;
+static volatile int lock_pte = 0x00;
+/*|SPIN FAMILY|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//**/
+/* argument MUST take address to global volatile int */
+/*|*/static void lock(volatile int *spin__) {
+/*|*/    while (__sync_lock_test_and_set(spin__, 1)) { ; }
+/*|*/}
+/*|*/static void unlock(volatile int *spin__) {
+/*|*/    __sync_synchronize(); /* Memory barrier. */
+/*|*/    *spin__ = 0x00;
+/*|*/}
 /*|PTE FAMILY|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*//*|*/
-/*|*/static void set_addr_rw(volatile uint64_t addr){
+/*|*/static void set_addr_rw(volatile uint64_t addr, int *flag){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
 /*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
 /*|*/   if (pte[0x00] & ~((unsigned long long int)1<<1))
-/*|*/		pte[0x00] |= ((unsigned long long int)1<<1);
+/*|*/		pte[0x00] |= ((unsigned long long int)1<<1), *flag = 0x00;
+/*|*/	else
+/*|*/		*flag = 0x01;
 /*|*/}
-/*|*/static void set_addr_ro(volatile uint64_t addr){
+/*|*/static void set_addr_ro(volatile uint64_t addr, int *flag){
 /*|*/   unsigned int level;
 /*|*/   uint64_t *pte = NULL;
 /*|*/   pte = (uint64_t*)lookup_address((unsigned long)addr, &level);
-/*|*/   pte[0x00] = pte[0x00] & ~((unsigned long long int)1<<1);
+/*|*/	if ( !*flag )
+/*|*/   	pte[0x00] = pte[0x00] & ~((unsigned long long int)1<<1);
 /*|*/}
 /*|*/static void set_addr_ex(volatile uint64_t addr){
 /*|*/   unsigned int level;
@@ -53,13 +79,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
 ////////////////////////////////////////////////////////////////////////////////
-#endif
-
-#ifndef USE_CR0_FAM
-# ifndef USE_PTE_FAM
-#  error "At least one FAM *must* be used..."
-# endif
-#endif
 
 #define MAKE_RW(addr) make_rw((uint64_t)addr)
 static void make_rw(uint64_t kaddr){
@@ -67,18 +86,28 @@ static void make_rw(uint64_t kaddr){
 	        kernel_write_enter();
 	#endif
 	#ifdef USE_PTE_FAM
-	        set_addr_rw( kaddr );
+		lock( &lock_pte );
+	        set_addr_rw( kaddr, &is_first_rw );
+		set_addr_rw( kaddr + 0x05, &is_last_rw );
 	#endif
 }
+/* This is the moust pretty solution of syncronization page borders
+ * and `if page with address already writable` condition
+ * which I found...
+ **/
 #define MAKE_RO(addr) make_ro((uint64_t)addr)
 static void make_ro(uint64_t kaddr){
 	#ifdef USE_PTE_FAM
-	        set_addr_ro( kaddr );
+	        set_addr_ro( kaddr, &is_first_rw );
+		set_addr_ro( kaddr + 0x05, &is_last_rw );
+		unlock( &lock_pte );
 	#endif
 	#ifdef USE_CR0_FAM
 	        kernel_write_leave();
 	#endif
 }
+
+#endif /* USE_PTE_FAM */
 
 
 #include <asm/insn.h>
