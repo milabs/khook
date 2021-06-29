@@ -94,9 +94,6 @@ static void khook_release(void)
 			printk("khook: waiting for %s...\n", p->target.name);
 		}
 	}
-#ifdef USE_PTE_FAM
-	set_addr_nx( khook_stub_tbl );
-#endif
 	vfree(khook_stub_tbl);
 }
 
@@ -121,15 +118,9 @@ int khook_init(void)
 	// region executable explicitly.
 	//
 	set_memory_x = (void *)khook_lookup_name("set_memory_x");
-#ifdef  USE_CR0_FAM
 	if (set_memory_x)
 		set_memory_x((unsigned long)khook_stub_tbl, numpages);
-#endif
-#ifdef  USE_PTE_FAM
-	do {	/* Yes, I pass <= 100 symbol in one line limitation :) */
-		set_addr_ex((unsigned long)khook_stub_tbl + ((-1 + numpages--) * PAGE_SIZE) + 0x01);
-	} while ( numpages );
-#endif
+
 	khook_resolve();
 	stop_machine(khook_sm_init_hooks, NULL, 0);
 
@@ -140,5 +131,4 @@ void khook_cleanup(void)
 {
 	stop_machine(khook_sm_cleanup_hooks, NULL, 0);
 	khook_release();
-	
 }
