@@ -19,7 +19,7 @@ static volatile int is_cr0_switched = 0x00;
 	"and $0xfffffffffffeffff, %%rax\n\t"	\
 	"mov %%rax, %%cr0\n\t"			\
 	::: "%rax" ); is_cr0_switched++;}while(0)
-# define kernel_write_leave() do{asm volatile (	\
+# define kernel_write_leave() do{ asm volatile (\
 	"mov %%cr0, %%rax\n\t"			\
 	"or $0x0000000000010000, %%rax\n\t"	\
 	"mov %%rax, %%cr0\n\t"			\
