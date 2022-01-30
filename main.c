@@ -6,15 +6,19 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/utsname.h>
+#include <linux/seq_file.h>
+#include <linux/proc_fs.h>
 #include <linux/random.h>
+#include <linux/uuid.h>
+
+static struct kernel_info {
+	unsigned int	a, b, c;
+	char		release[__NEW_UTS_LEN + 1];
+	char		version[__NEW_UTS_LEN + 1];
+	uuid_t		uuid;
+} kinfo = {};
 
 ////////////////////////////////////////////////////////////////////////////////
-
-static struct {
-	dev_t		id;
-} restrict_devs[] = {
-	{ MKDEV(1, 11) }, // /dev/kmsg
-};
 
 static struct {
 	const char *	name;
@@ -23,28 +27,78 @@ static struct {
 } restrict_inodes[] = {
 	{ "/boot" },
 	{ "/lib/modules" },
-	// TODO: http://linuxmafia.com/faq/Admin/release-files.html
-	{ "/proc/kmsg" },
-	{ "/proc/version" },
-	{ "/proc/cmdline" },
 	{ "/proc/modules" },
 	{ "/proc/kallsyms" },
 	{ "/proc/config.gz" },
 };
 
+static int show_cmdline(struct seq_file *m, void *v);
+static int show_version(struct seq_file *m, void *v);
+
+static struct {
+	const char *name;
+	int (*show)(struct seq_file *m, void *v);
+	int (*show_orig)(struct seq_file *m, void *v);
+} seq_forge_files[] = {
+	{ "/proc/cmdline", show_cmdline },
+	{ "/proc/version", show_version },
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
-static int do_restrict_dev(struct inode *inode) {
+static int seq_forge_init(void) {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(restrict_devs); i++) {
-		if (inode->i_rdev == restrict_devs[i].id) {
-			return -EPERM;
+	for (i = 0; i < ARRAY_SIZE(seq_forge_files); i++) {
+		struct file *f = NULL;
+		if (!seq_forge_files[i].name)
+			continue;
+		if ((f = filp_open(seq_forge_files[i].name, 0, 0)) != NULL) {
+			seq_forge_files[i].show_orig = ((struct seq_file *)f->private_data)->op->show;
+			filp_close(f, NULL);
+		} else {
+			seq_forge_files[i].name = NULL;
 		}
 	}
 
 	return 0;
 }
+
+KHOOK(single_open);
+static int khook_single_open(struct file *file, int (*show)(struct seq_file *, void *), void *data) {
+	int i, ret = KHOOK_ORIGIN(single_open, file, show, data);
+
+	for (i = 0; !ret && i < ARRAY_SIZE(seq_forge_files); i++) {
+		if (show == seq_forge_files[i].show_orig) {
+			struct seq_file *seq = (void *)file->private_data;
+			seq->private = seq_forge_files[i].show_orig; // pass origin to show()
+			((struct seq_operations *)seq->op)->show = seq_forge_files[i].show;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int show_version(struct seq_file *m, void *v) {
+	int (*show_orig)(struct seq_file *, void *v) = (void *)m->private;
+	if (!uid_eq(current_cred()->uid, GLOBAL_ROOT_UID)) {
+		return seq_printf(m, "%s", kinfo.version), 0;
+	} else {
+		return show_orig(m, NULL);
+	}
+}
+
+static int show_cmdline(struct seq_file *m, void *v) {
+	int (*show_orig)(struct seq_file *, void *v) = (void *)m->private;
+	if (!uid_eq(current_cred()->uid, GLOBAL_ROOT_UID)) {
+		return seq_printf(m, "linux /boot/vmlinuz-%s root=UUID=%pUl quiet ro\n", kinfo.release, &kinfo.uuid), 0;
+	} else {
+		return show_orig(m, NULL);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 static int do_restrict_inodes(struct inode *inode) {
 	int i;
@@ -97,9 +151,7 @@ static int khook_inode_permission(struct inode *inode, int mask) {
 	int ret = KHOOK_ORIGIN(inode_permission, inode, mask);
 
 	if (!ret && !uid_eq(current_cred()->uid, GLOBAL_ROOT_UID)) {
-		if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
-			ret = do_restrict_dev(inode);
-		} else if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) {
+		if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) {
 			ret = do_restrict_inodes(inode);
 		}
 	}
@@ -132,16 +184,11 @@ static int khook_security_syslog(int type, int dummy) {
 static void forge_unforge_utsname(void) {
 	static struct new_utsname orig = { 0 };
 	typeof(orig) *uts = utsname();
-	
+
 	if (!orig.version[0]) {
-		int rand = get_random_int();
 		memcpy(&orig, uts, sizeof(orig));
-		snprintf(uts->version, sizeof(uts->version), "# %s",
-			 KBUILD_BUILD_TIMESTAMP);
-		snprintf(uts->release,  sizeof(uts->release), "%u.%u.%u",
-			 (LINUX_VERSION_CODE >> 16) & 0xff,
-			 (LINUX_VERSION_CODE >> 8) & 0xff,
-			 (LINUX_VERSION_CODE ^ rand) & 0xff);
+		snprintf(uts->version, sizeof(uts->version), "%s", kinfo.version);
+		snprintf(uts->release, sizeof(uts->release), "%s", kinfo.release);
 	} else {
 		memcpy(utsname(), &orig, sizeof(orig));
 		memset(&orig, 0, sizeof(orig));
@@ -150,6 +197,21 @@ static void forge_unforge_utsname(void) {
 
 int init_module(void) {
 	int ret = -EINVAL;
+
+	seq_forge_init();
+
+	kinfo.a = (LINUX_VERSION_CODE >> 16) & 0xff;
+	kinfo.b = (LINUX_VERSION_CODE >>  8) & 0xff;
+	kinfo.c = get_random_int() & 0xff;
+
+	snprintf(kinfo.version,
+		sizeof(kinfo.release),
+		"# %s", KBUILD_BUILD_TIMESTAMP);
+	snprintf(kinfo.release,
+		sizeof(kinfo.release),
+		"%u.%u.%u", kinfo.a, kinfo.b, kinfo.c);
+
+	generate_random_uuid(kinfo.uuid.b);
 
 	ret = init_restrict();
 	if (ret) goto out;
