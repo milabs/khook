@@ -16,6 +16,7 @@ static struct kernel_info {
 	char		release[__NEW_UTS_LEN + 1];
 	char		version[__NEW_UTS_LEN + 1];
 	uuid_t		uuid;
+	void *		sem;
 } kinfo = {};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -179,21 +180,58 @@ static int khook_security_syslog(int type, int dummy) {
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////
+KHOOK_EXT(int, __do_sys_newuname, struct new_utsname *);
+static int khook___do_sys_newuname(struct new_utsname *name) {
+	if (!uid_eq(current_cred()->uid, GLOBAL_ROOT_UID)) {
+		struct new_utsname tmp;
 
-static void forge_unforge_utsname(void) {
-	static struct new_utsname orig = { 0 };
-	typeof(orig) *uts = utsname();
+		if (kinfo.sem) down_read(kinfo.sem);
+		memcpy(&tmp, utsname(), sizeof(tmp));
+		if (kinfo.sem) up_read(kinfo.sem);
 
-	if (!orig.version[0]) {
-		memcpy(&orig, uts, sizeof(orig));
-		snprintf(uts->version, sizeof(uts->version), "%s", kinfo.version);
-		snprintf(uts->release, sizeof(uts->release), "%s", kinfo.release);
+		memcpy(tmp.version, kinfo.version, sizeof(tmp.version));
+		memcpy(tmp.release, kinfo.release, sizeof(tmp.release));
+		if (copy_to_user(name, &tmp, sizeof(tmp)))
+			return -EFAULT;
+
+		WARN_ON_ONCE(current->personality & UNAME26); // FIXME
+		WARN_ON_ONCE(personality(current->personality) == PER_LINUX32); // FIXME
+
+		return 0;
 	} else {
-		memcpy(utsname(), &orig, sizeof(orig));
-		memset(&orig, 0, sizeof(orig));
+		return KHOOK_ORIGIN(__do_sys_newuname, name);
 	}
 }
+
+#ifdef __ARCH_WANT_SYS_OLD_UNAME
+KHOOK_EXT(int, __do_sys_uname, struct old_utsname *);
+static int khook___do_sys_uname(struct old_utsname *name) {
+	if (!uid_eq(current_cred()->uid, GLOBAL_ROOT_UID)) {
+		struct old_utsname tmp;
+
+		if (!name)
+			return -EFAULT;
+
+		if (kinfo.sem) down_read(kinfo.sem);
+		memcpy(&tmp, utsname(), sizeof(tmp));
+		if (kinfo.sem) up_read(kinfo.sem);
+
+		memcpy(tmp.version, kinfo.version, sizeof(tmp.version));
+		memcpy(tmp.release, kinfo.release, sizeof(tmp.release));
+		if (copy_to_user(name, &tmp, sizeof(tmp)))
+			return -EFAULT;
+
+		WARN_ON_ONCE(current->personality & UNAME26); // FIXME
+		WARN_ON_ONCE(personality(current->personality) == PER_LINUX32); // FIXME
+
+		return 0;
+	} else {
+		return KHOOK_ORIGIN(__do_sys_uname, name);
+	}
+}
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
 
 int init_module(void) {
 	int ret = -EINVAL;
@@ -213,13 +251,13 @@ int init_module(void) {
 
 	generate_random_uuid(kinfo.uuid.b);
 
+	kinfo.sem = (void *)khook_lookup_name("uts_sem");
+
 	ret = init_restrict();
 	if (ret) goto out;
 
 	ret = khook_init();
 	if (ret) goto out_cleanup;
-
-	forge_unforge_utsname();
 
 	return 0;
 
@@ -232,7 +270,6 @@ out:
 void cleanup_module(void) {
 	khook_cleanup();
 	cleanup_restrict();
-	forge_unforge_utsname();
 }
 
 MODULE_LICENSE("GPL\0but who really cares?");

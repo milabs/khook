@@ -5,6 +5,7 @@
 *.ko.unsigned
 *.cmd
 *.mod
+*.dwo
 *.mod.c
 *.order
 *.symvers
