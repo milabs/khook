@@ -21,7 +21,11 @@ KHOOK_STUB_orig:
 # make a local copy of all arguments starting from N as they are
 # passed through the stack as per the ABI.
 #
-# TODO: x86-32 implementation of CALL_COPY_N_ARGS macro
+# On the Intel 386, the regparm attribute causes the compiler to
+# pass up to number integer arguments in registers EAX, EDX, and
+# ECX instead of on the stack. Functions that take a variable number
+# of arguments will continue to be passed all of their arguments
+# on the stack.
 #
 
 #ifdef __x86_64__
@@ -43,14 +47,27 @@ KHOOK_STUB_hook:
 	lock decl KHOOK_STUB_atomic_use_count(%rip)
 	ret
 #else
+.macro CALL_COPY_N_ARGS n
+	sub $(\n * 4), %esp
+	.set i, 0
+	.rept \n
+		mov ((\n + i + 1) * 4)(%esp), %ebx
+		mov %ebx, (i * 4)(%esp)
+		.set i, i + 1
+	.endr
+	mov $0xcacacaca, %ebx
+	call *%ebx
+	add $(\n * 4), %esp
+.endm
 KHOOK_STUB_hook:
+	push %ebx
 	call 1f
-1:	pop %eax
-	lock incl -(1b - KHOOK_STUB_atomic_use_count)(%eax)
-	mov $0xcacacaca, %eax
-	call *%eax
+1:	pop %ebx
+	lock incl -(1b - KHOOK_STUB_atomic_use_count)(%ebx)
+	CALL_COPY_N_ARGS 10
 	call 1f
-1:	pop %ecx
-	lock decl -(1b - KHOOK_STUB_atomic_use_count)(%ecx)
+1:	pop %ebx
+	lock decl -(1b - KHOOK_STUB_atomic_use_count)(%ebx)
+	pop %ebx
 	ret
 #endif

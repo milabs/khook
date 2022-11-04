@@ -1,5 +1,23 @@
 #include "../internal.h"
 
+#ifdef __i686__
+
+#define kernel_write_enter() asm volatile (	\
+	"cli\n\t"				\
+	"mov %%cr0, %%eax\n\t"			\
+	"and $0xfffeffff, %%eax\n\t"		\
+	"mov %%eax, %%cr0\n\t"			\
+	::: "%eax" )
+
+#define kernel_write_leave() asm volatile (	\
+	"mov %%cr0, %%eax\n\t"			\
+	"or $0x00010000, %%eax\n\t"		\
+	"mov %%eax, %%cr0\n\t"			\
+	"sti\n\t"				\
+	::: "%eax" )
+
+#else
+
 #define kernel_write_enter() asm volatile (	\
 	"cli\n\t"				\
 	"mov %%cr0, %%rax\n\t"			\
@@ -13,6 +31,8 @@
 	"mov %%rax, %%cr0\n\t"			\
 	"sti\n\t"				\
 	::: "%rax" )
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
