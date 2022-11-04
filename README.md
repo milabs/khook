@@ -64,6 +64,8 @@ static int khook_scsi_execute(struct scsi_device *sdev, const unsigned char *cmd
 
 ~~~
 
+Starting from [f996ce39](https://github.com/milabs/khook/commit/f996ce39fbcb70ed3e6565808b2b76afe6b5e8ff) it's possible to hook `x86-32` kernels as correct trampoline has been implemented.
+
 ## Hooking of system calls (handler functions)
 
 An example of hooking `kill(2)` system call handler (see [#3](/../../issues/3) for the details):
@@ -128,4 +130,4 @@ This software is licensed under the GPL.
 
 [Ilya V. Matveychikov](https://github.com/milabs)
 
-2018, 2019, 2020
+2018, 2019, 2020, 2022
