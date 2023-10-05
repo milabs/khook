@@ -4,17 +4,26 @@ KHOOK (خوک) - Linux Kernel hooking engine.
 
 # Usage
 
-Include KHOOK engine:
+Include `Makefile.khook` to your `Makefile/Kbuild` file:
 ~~~
-#include "khook/engine.c"
+NODNAME      ?= your-module-name
+...
+include      /path/to/khook/Makefile.khook
+...
+$(MODNAME)-y += $(KHOOK_GOALS)
+ccflags-y    += $(KHOOK_CCFLAGS)
+ldflags-y    += $(KHOOK_LDFLAGS) # use LDFLAGS for old kernels
+...
 ~~~
 
-Add the following line to the KBuild/Makefile:
+Then, include KHOOK engine header like follows:
 ~~~
-ldflags-y += -T$(src)/khook/engine.lds (use LDFLAGS for old kernels)
+#include <khook/engine.h>
 ~~~
 
 Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine.
+
+Use `khook_lookup_name(sym)` to resolve `sym` address.
 
 # Examples
 
@@ -130,4 +139,4 @@ This software is licensed under the GPL.
 
 [Ilya V. Matveychikov](https://github.com/milabs)
 
-2018, 2019, 2020, 2022
+2018, 2019, 2020, 2022, 2023
