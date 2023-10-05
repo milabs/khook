@@ -77,52 +77,82 @@ static inline int khook_arch_lde_get_length(const void *p) {
 ////////////////////////////////////////////////////////////////////////////////
 
 // place a jump at addr @a from addr @f to addr @t
-static inline void x86_put_jmp(void *a, void *f, void *t)
-{
+static inline void x86_put_jmp(void *a, void *f, void *t) {
 	*((char *)(a + 0)) = 0xE9;
 	*(( int *)(a + 1)) = (long)(t - (f + 5));
 }
 
-static const char khook_stub_template[] = {
-# include KHOOK_STUB_FILE_NAME
-};
+static inline void khook_arch_create_stub(khook_t *hook) {
+	if (!(hook->flags & KHOOK_F_NOREF)) {
+		const size_t nbytes = (void *)KHOOK_STUB_hook_end - (void *)KHOOK_STUB_hook;
+		memcpy(hook->stub, KHOOK_STUB_hook, nbytes);
+	} else {
+		const size_t nbytes = (void *)KHOOK_STUB_hook_noref_end - (void *)KHOOK_STUB_hook_noref;
+		memcpy(hook->stub, KHOOK_STUB_hook_noref, nbytes);
+	}
 
-static inline void stub_fixup(void *stub, const void *value) {
-	while (*(int *)stub != 0xcacacaca) stub++;
-	*(long *)stub = (long)value;
+	//
+	// fixup for the @fn address
+	//
+
+	if (hook->fn) {
+		void *p = hook->stub;
+		while (*(int *)p != 0x7a7a7a7a) p++;
+		*(long *)p = (long)hook->fn;
+	}
+
+	//
+	// fixup for the @use_count (twice)
+	//
+	
+	if (!(hook->flags & KHOOK_F_NOREF)) {
+		void *p = hook->stub;
+#ifdef __x86_64__
+		// 1st reference
+		while (*(int *)p != 0x7b7b7b7b) p++;
+		*(int *)p = (int)((long)&hook->use_count - ((long)p + 4)), p += 4;
+		// 2nd reference
+		while (*(int *)p != 0x7b7b7b7b) p++;
+		*(int *)p = (int)((long)&hook->use_count - ((long)p + 4)), p += 4;
+#else
+		// 1st reference
+		while (*(int *)p != 0x7b7b7b7b) p++;
+		*(int *)p = (int)&hook->use_count, p += 4;
+		// 2nd reference
+		while (*(int *)p != 0x7b7b7b7b) p++;
+		*(int *)p = (int)&hook->use_count, p += 4;
+#endif
+	}
 }
 
-static inline void khook_arch_sm_init_one(khook_t *hook) {
-	khook_stub_t *stub = KHOOK_STUB(hook);
+static inline void khook_arch_create_orig(khook_t *hook) {
+	memcpy(hook->orig, hook->target.addr, hook->nbytes);
+	x86_put_jmp(hook->orig + hook->nbytes, hook->orig + hook->nbytes, hook->target.addr + hook->nbytes);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void khook_arch_sm_init_one(khook_t *hook) {
 	if (hook->target.addr[0] == (char)0xE9 ||
 	    hook->target.addr[0] == (char)0xCC) return;
 
-	BUILD_BUG_ON(sizeof(khook_stub_template) > offsetof(khook_stub_t, nbytes));
-	memcpy(stub, khook_stub_template, sizeof(khook_stub_template));
-	stub_fixup(stub->hook, hook->fn);
-
-	while (stub->nbytes < 5)
-		stub->nbytes += khook_arch_lde_get_length(hook->target.addr + stub->nbytes);
-
-	memcpy(stub->orig, hook->target.addr, stub->nbytes);
-	x86_put_jmp(stub->orig + stub->nbytes, stub->orig + stub->nbytes, hook->target.addr + stub->nbytes);
-	kernel_write_enter();
-	if (hook->flags & KHOOK_F_NOREF) {
-		x86_put_jmp(hook->target.addr, hook->target.addr, hook->fn);
-	} else {
-		x86_put_jmp(hook->target.addr, hook->target.addr, stub->hook);
+	while (hook->nbytes < 5) {
+		hook->nbytes += khook_arch_lde_get_length(hook->target.addr + hook->nbytes);
 	}
-	kernel_write_leave();
 
-	hook->orig = stub->orig; // the only link from hook to stub
-}
-
-static inline void khook_arch_sm_cleanup_one(khook_t *hook) {
-	khook_stub_t *stub = KHOOK_STUB(hook);
 	kernel_write_enter();
-	memcpy(hook->target.addr, stub->orig, stub->nbytes);
+	khook_arch_create_stub(hook);
+	khook_arch_create_orig(hook);
+	x86_put_jmp(hook->target.addr, hook->target.addr, hook->stub); // activate
 	kernel_write_leave();
 }
 
-#define KHOOK_ARCH_INIT(...)					\
-	(khook_arch_lde_init())
+void khook_arch_sm_cleanup_one(khook_t *hook) {
+	kernel_write_enter();
+	memcpy(hook->target.addr, hook->orig, hook->nbytes); // deactivate
+	kernel_write_leave();
+}
+
+long khook_arch_init(void) {
+	return khook_arch_lde_init();
+}

@@ -1,7 +1,5 @@
 #include "internal.h"
 
-static khook_stub_t *khook_stub_tbl = NULL;
-
 ////////////////////////////////////////////////////////////////////////////////
 
 static long lookupName = 0;
@@ -32,14 +30,6 @@ unsigned long khook_lookup_name(const char *name)
 		lookup_name = (void *)lookupName;
 	return lookup_name ? lookup_name(name) : 0;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-
-#ifdef CONFIG_X86
-# include "x86/hook.c"
-#else
-# error Target CPU architecture is NOT supported !!!
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -86,41 +76,27 @@ static void khook_release(void)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
-		khook_stub_t *stub = KHOOK_STUB(p);
 		if (!p->target.addr) continue;
-		while (atomic_read(&stub->use_count) > 0) {
+		while (atomic_read(&p->use_count) > 0) {
 			khook_wakeup();
 			msleep_interruptible(1000);
 			printk("khook: waiting for %s...\n", p->target.name);
 		}
 	}
-	vfree(khook_stub_tbl);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 int khook_init(void)
 {
-	void *(*malloc)(long size) = NULL;
-	int   (*set_memory_x)(unsigned long, int) = NULL;
+	const size_t max_stub_size = 0x80; // NOTE: keep in sync with value in engine.h
 
-	malloc = (void *)khook_lookup_name("module_alloc");
-	if (!malloc || KHOOK_ARCH_INIT()) return -EINVAL;
-
-	khook_stub_tbl = malloc(KHOOK_STUB_TBL_SIZE);
-	if (!khook_stub_tbl) return -ENOMEM;
-	memset(khook_stub_tbl, 0, KHOOK_STUB_TBL_SIZE);
-
-	//
-	// Since some point memory allocated by module_alloc() doesn't
-	// have eXecutable attributes. That's why we have to mark the
-	// region executable explicitly.
-	//
-
-	set_memory_x = (void *)khook_lookup_name("set_memory_x");
-	if (set_memory_x) {
-		int numpages = round_up(KHOOK_STUB_TBL_SIZE, PAGE_SIZE) / PAGE_SIZE;
-		set_memory_x((unsigned long)khook_stub_tbl, numpages);
+	if ((((void *)KHOOK_STUB_hook_end - (void *)KHOOK_STUB_hook) > max_stub_size) ||
+	    (((void *)KHOOK_STUB_hook_noref_end - (void *)KHOOK_STUB_hook_noref_end) > max_stub_size)) {
+		printk("FIXME: stub function size have to be increased\n");
+		return -EINVAL;
+	} else if (khook_arch_init()) {
+		return -EINVAL;
 	}
 
 	khook_resolve();
