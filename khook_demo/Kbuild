@@ -1,6 +1,6 @@
 MODNAME		?= khook-demo
 
-include $(src)/Makefile.khook
+include $(src)/../Makefile.khook
 
 obj-m		+= $(MODNAME).o
 $(MODNAME)-y	+= main.o $(KHOOK_GOALS)

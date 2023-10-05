@@ -27,6 +27,8 @@ Use `khook_lookup_name(sym)` to resolve `sym` address.
 
 # Examples
 
+See the `khook_demo` folder for examples. Use `make` to build it.
+
 ## Hooking of generic kernel functions 
 
 An example of hooking a kernel function with known prototype (function is defined in `linux/fs.h`):
@@ -99,6 +101,7 @@ static long khook___x64_sys_kill(const struct pt_regs *regs) {
 - x86 only
 - 2.6.33+ kernels
 - use of in-kernel length disassembler
+- ready-to-use submodule with no external deps
 
 # How it works?
 
