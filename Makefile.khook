@@ -1,0 +1,6 @@
+ifneq ($(KERNELRELEASE),)
+KHOOK_DIR	:= $(shell dirname $(shell realpath --relative-to=$(src) $(lastword $(MAKEFILE_LIST))))
+KHOOK_GOALS	:= $(KHOOK_DIR)/khook/engine.o
+KHOOK_CCFLAGS	:= -I$(src)/$(KHOOK_DIR)
+KHOOK_LDFLAGS	:= -T$(src)/$(KHOOK_DIR)/khook/engine.lds
+endif
