@@ -122,15 +122,15 @@ The diagram below illustrates the call to function `X` when `KHOOK` is used:
 CALLER
 | ...
 | CALL X -(1)---> X
-| ...  <----.     | JUMP -(2)----> STUB.hook
+| ...  <----.     | JUMP -(2)----> khook_X_stub
 ` RET       |     | ???            | INCR use_count
-            |     | ...  <----.    | CALL handler -(3)------> HOOK.fn
+            |     | ...  <----.    | CALL handler   -(3)----> khook_X
             |     | ...       |    | DECR use_count <----.    | ...
-            |     ` RET -.    |    ` RET -.              |    | CALL origin -(4)-----> STUB.orig
-            |            |    |           |              |    | ...  <----.            | N bytes of X
-            |            |    |           |              |    ` RET -.    |            ` JMP X + N -.
-            `------------|----|-------(8)-'              '-------(7)-'    |                         |
-                         |    `-------------------------------------------|---------------------(5)-'
+            |     ` RET -.    |    ` RET -.              |    | CALL origin -(4)----> khook_X_orig
+            |            |    |           |              |    | ...  <----.           | N bytes of X
+            |            |    |           |              |    ` RET -.    |           ` JMP X + N -.
+            `------------|----|-------(8)-'              '-------(7)-'    |                        |
+                         |    `-------------------------------------------|--------------------(5)-'
                          `-(6)--------------------------------------------'
 ~~~
 
