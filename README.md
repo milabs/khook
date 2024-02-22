@@ -25,6 +25,8 @@ Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking 
 
 Use `khook_lookup_name(sym)` to resolve `sym` address.
 
+Use `khook_write_kernel(fn, arg)` to write kernel read-only data.
+
 # Examples
 
 See the `khook_demo` folder for examples. Use `make` to build it.
@@ -142,4 +144,4 @@ This software is licensed under the GPL.
 
 [Ilya V. Matveychikov](https://github.com/milabs)
 
-2018, 2019, 2020, 2022, 2023
+2018, 2019, 2020, 2022, 2023, 2024
