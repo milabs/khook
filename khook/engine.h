@@ -54,4 +54,5 @@ typedef struct {
 
 extern int khook_init(void);
 extern void khook_cleanup(void);
+extern long khook_write_kernel(long (*)(void *), void *);
 extern unsigned long khook_lookup_name(const char *);

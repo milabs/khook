@@ -38,3 +38,4 @@ extern unsigned long KHOOK_STUB_hook_noref_end[];
 extern long khook_arch_init(void);
 extern void khook_arch_sm_init_one(khook_t *hook);
 extern void khook_arch_sm_cleanup_one(khook_t *hook);
+extern long khook_arch_write_kernel(long (*)(void *), void *);

@@ -31,6 +31,10 @@ unsigned long khook_lookup_name(const char *name)
 	return lookup_name ? lookup_name(name) : 0;
 }
 
+long khook_write_kernel(long (*fn)(void *), void *arg) {
+	return khook_arch_write_kernel(fn, arg);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 static void khook_wakeup(void)

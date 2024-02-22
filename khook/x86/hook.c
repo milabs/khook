@@ -132,6 +132,16 @@ static inline void khook_arch_create_orig(khook_t *hook) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+long khook_arch_write_kernel(long (* fn)(void *), void *arg) {
+	long res = 0;
+
+	kernel_write_enter();
+	res = fn(arg);
+	kernel_write_leave();
+
+	return res;
+}
+
 void khook_arch_sm_init_one(khook_t *hook) {
 	if (hook->target.addr[0] == (char)0xE9 ||
 	    hook->target.addr[0] == (char)0xCC) return;
