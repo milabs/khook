@@ -48,12 +48,12 @@ static struct {
 static inline int khook_arch_lde_init(void) {
 	khook_arch_lde.init = (void *)khook_lookup_name("insn_init");
 	if (!khook_arch_lde.init) {
-		printk("khook: can't find insn_init symbol\n");
+		pr_err("khook: can't find insn_init symbol\n");
 		return -EINVAL;
 	}
 	khook_arch_lde.get_length = (void *)khook_lookup_name("insn_get_length");
 	if (!khook_arch_lde.get_length) {
-		printk("khook: can't find insn_get_length symbol\n");
+		pr_err("khook: can't find insn_get_length symbol\n");
 		return -EINVAL;
 	}
 	return 0;

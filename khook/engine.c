@@ -72,7 +72,7 @@ static void khook_resolve(void)
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
 		p->target.addr = (void *)khook_lookup_name(p->target.name);
-		if (!p->target.addr) printk("khook: failed to lookup %s symbol\n", p->target.name);
+		if (!p->target.addr) pr_warn("khook: failed to lookup %s symbol\n", p->target.name);
 	}
 }
 
@@ -84,7 +84,7 @@ static void khook_release(void)
 		while (atomic_read(&p->use_count) > 0) {
 			khook_wakeup();
 			msleep_interruptible(1000);
-			printk("khook: waiting for %s...\n", p->target.name);
+			pr_info("khook: waiting for %s...\n", p->target.name);
 		}
 	}
 }
@@ -97,7 +97,7 @@ int khook_init(void)
 
 	if ((((void *)KHOOK_STUB_hook_end - (void *)KHOOK_STUB_hook) > max_stub_size) ||
 	    (((void *)KHOOK_STUB_hook_noref_end - (void *)KHOOK_STUB_hook_noref_end) > max_stub_size)) {
-		printk("FIXME: stub function size have to be increased\n");
+		pr_err("khook: stub function size have to be increased\n");
 		return -EINVAL;
 	} else if (khook_arch_init()) {
 		return -EINVAL;
