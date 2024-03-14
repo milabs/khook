@@ -52,7 +52,10 @@ typedef struct {
 #define KHOOK_ORIGIN(t, ...)						\
 	((typeof(t) *)KHOOK_##t.orig)(__VA_ARGS__)
 
-extern int khook_init(void);
-extern void khook_cleanup(void);
-extern long khook_write_kernel(long (*)(void *), void *);
+typedef unsigned long (*khook_lookup_t)(const char *);
 extern unsigned long khook_lookup_name(const char *);
+
+extern int khook_init(khook_lookup_t);
+extern void khook_cleanup(void);
+
+extern long khook_write_kernel(long (*)(void *), void *);

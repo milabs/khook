@@ -7,6 +7,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/sched.h>
+#include <linux/moduleparam.h>
 
 #ifdef CONFIG_KPROBES
 # include <linux/kprobes.h>

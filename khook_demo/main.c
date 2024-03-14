@@ -71,7 +71,7 @@ static int khook_load_elf_binary(struct linux_binprm *bprm)
 
 int init_module(void)
 {
-	return khook_init();
+	return khook_init(NULL);
 }
 
 void cleanup_module(void)

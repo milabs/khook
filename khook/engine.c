@@ -67,11 +67,13 @@ static int khook_sm_cleanup_hooks(void *arg)
 	return 0;
 }
 
-static void khook_resolve(void)
+static void khook_resolve(khook_lookup_t lookup)
 {
 	khook_t *p;
 	KHOOK_FOREACH_HOOK(p) {
-		p->target.addr = (void *)khook_lookup_name(p->target.name);
+		p->target.addr = lookup ? \
+			(void *)lookup(p->target.name) : \
+			(void *)khook_lookup_name(p->target.name);
 		if (!p->target.addr) pr_warn("khook: failed to lookup %s symbol\n", p->target.name);
 	}
 }
@@ -91,7 +93,7 @@ static void khook_release(void)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-int khook_init(void)
+int khook_init(khook_lookup_t lookup)
 {
 	const size_t max_stub_size = 0x80; // NOTE: keep in sync with value in engine.h
 
@@ -103,7 +105,7 @@ int khook_init(void)
 		return -EINVAL;
 	}
 
-	khook_resolve();
+	khook_resolve(lookup);
 	stop_machine(khook_sm_init_hooks, NULL, 0);
 
 	return 0;

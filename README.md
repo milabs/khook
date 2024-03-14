@@ -21,7 +21,7 @@ Then, include KHOOK engine header like follows:
 #include <khook/engine.h>
 ~~~
 
-Use `khook_init()` and `khook_cleanup()` to initalize and de-initialize hooking engine.
+Use `khook_init(lookup)` and `khook_cleanup()` to initalize and de-initialize hooking engine.
 
 Use `khook_lookup_name(sym)` to resolve `sym` address.
 
