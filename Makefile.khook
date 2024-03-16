@@ -1,7 +1,9 @@
+realpath_relative_to = $(shell perl -e 'use File::Spec; print File::Spec->abs2rel("$(2)","$(1)")') # realpath --relative-to=/a/path /b/path
+
 ifneq ($(KERNELRELEASE),)
-KHOOK_DIR	:= $(shell dirname $(shell realpath --relative-to=$(src) $(lastword $(MAKEFILE_LIST))))
+KHOOK_DIR	:= $(patsubst %/,%,$(dir $(call realpath_relative_to,$(src),$(lastword $(MAKEFILE_LIST)))))
 KHOOK_GOALS	:= $(KHOOK_DIR)/khook/engine.o
-ifeq ($(ARCH),x86)
+ifeq (x86,$(findstring x86,$(ARCH)))
 KHOOK_GOALS	+= $(KHOOK_DIR)/khook/x86/hook.o $(KHOOK_DIR)/khook/x86/stub.o
 else
 $(error "ARCH is NOT supported")
