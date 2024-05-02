@@ -12,4 +12,5 @@ KHOOK_CCFLAGS	:= -I$(src)/$(KHOOK_DIR) $(call cc-option,-fcf-protection=none)
 KHOOK_LDFLAGS	:= -T$(src)/$(KHOOK_DIR)/khook/engine.lds
 endif
 
-export OBJECT_FILES_NON_STANDARD_stub.o += y # do not call objtool
+# do not call objtool for stub file
+OBJECT_FILES_NON_STANDARD_stub.o += y
