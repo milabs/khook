@@ -1,38 +1,43 @@
 #include "../internal.h"
 
-#ifdef __i686__
-
-#define kernel_write_enter() asm volatile (	\
-	"cli\n\t"				\
-	"mov %%cr0, %%eax\n\t"			\
-	"and $0xfffeffff, %%eax\n\t"		\
-	"mov %%eax, %%cr0\n\t"			\
-	::: "%eax" )
-
-#define kernel_write_leave() asm volatile (	\
-	"mov %%cr0, %%eax\n\t"			\
-	"or $0x00010000, %%eax\n\t"		\
-	"mov %%eax, %%cr0\n\t"			\
-	"sti\n\t"				\
-	::: "%eax" )
-
-#else
-
-#define kernel_write_enter() asm volatile (	\
-	"cli\n\t"				\
-	"mov %%cr0, %%rax\n\t"			\
-	"and $0xfffffffffffeffff, %%rax\n\t"	\
-	"mov %%rax, %%cr0\n\t"			\
-	::: "%rax" )
-
-#define kernel_write_leave() asm volatile (	\
-	"mov %%cr0, %%rax\n\t"			\
-	"or $0x0000000000010000, %%rax\n\t"	\
-	"mov %%rax, %%cr0\n\t"			\
-	"sti\n\t"				\
-	::: "%rax" )
-
+#ifndef X86_CR0_WP
+# define X86_CR0_WP (1UL << 16)
 #endif
+
+#ifndef X86_CR4_CET
+# define X86_CR4_CET (1UL << 23)
+#endif
+
+#ifndef __FORCE_ORDER
+# define __FORCE_ORDER "m"(*(unsigned int *)0x1000UL)
+#endif
+
+static inline unsigned long x86_read_cr0(void) {
+	unsigned long val;
+	asm volatile("mov %%cr0, %0\n" : "=r" (val) : __FORCE_ORDER);
+	return val;
+}
+
+static inline void x86_write_cr0(unsigned long val) {
+	asm volatile("mov %0, %%cr0\n": "+r" (val) : : "memory");
+}
+
+static inline unsigned long x86_read_cr4(void) {
+	unsigned long val;
+#ifdef CONFIG_X86_32
+	asm volatile("1: mov %%cr4, %0\n"
+		     "2:\n"
+		     _ASM_EXTABLE(1b, 2b)
+		     : "=r" (val) : "0" (0), __FORCE_ORDER);
+#else
+	asm volatile("mov %%cr4, %0\n" : "=r" (val) : __FORCE_ORDER);
+#endif
+	return val;
+}
+
+static inline void x86_write_cr4(unsigned long val) {
+	asm volatile("mov %0, %%cr4\n": "+r" (val) : : "memory");
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // IN-kernel length disassembler engine (x86 only, 2.6.33+)
@@ -133,16 +138,35 @@ static inline void khook_arch_create_orig(khook_t *hook) {
 ////////////////////////////////////////////////////////////////////////////////
 
 long khook_arch_write_kernel(long (* fn)(void *), void *arg) {
-	long res = 0;
+	long res = 0, cr0, cr4;
 
-	kernel_write_enter();
+	asm volatile ("cli\n");
+
+	cr0 = x86_read_cr0();
+	cr4 = x86_read_cr4();
+
+	if (cr4 & X86_CR4_CET)
+		x86_write_cr4(cr4 & ~X86_CR4_CET);
+	x86_write_cr0(cr0 & ~X86_CR0_WP);
+
 	res = fn(arg);
-	kernel_write_leave();
+
+	x86_write_cr0(cr0);
+	if (cr4 & X86_CR4_CET)
+		x86_write_cr4(cr4);
+
+	asm volatile ("sti\n");
 
 	return res;
 }
 
 void khook_arch_sm_init_one(khook_t *hook) {
+	void _activate(khook_t *hook) {
+		khook_arch_create_stub(hook);
+		khook_arch_create_orig(hook);
+		x86_put_jmp(hook->target.addr, hook->target.addr, hook->stub);
+	}
+
 	if (hook->target.addr[0] == (char)0xE9 ||
 	    hook->target.addr[0] == (char)0xCC) return;
 
@@ -150,17 +174,15 @@ void khook_arch_sm_init_one(khook_t *hook) {
 		hook->nbytes += khook_arch_lde_get_length(hook->target.addr + hook->nbytes);
 	}
 
-	kernel_write_enter();
-	khook_arch_create_stub(hook);
-	khook_arch_create_orig(hook);
-	x86_put_jmp(hook->target.addr, hook->target.addr, hook->stub); // activate
-	kernel_write_leave();
+	khook_arch_write_kernel((void *)_activate, hook);
 }
 
 void khook_arch_sm_cleanup_one(khook_t *hook) {
-	kernel_write_enter();
-	memcpy(hook->target.addr, hook->orig, hook->nbytes); // deactivate
-	kernel_write_leave();
+	void _deactivate(khook_t *hook) {
+		memcpy(hook->target.addr, hook->orig, hook->nbytes);
+	}
+
+	khook_arch_write_kernel((void *)_deactivate, hook);
 }
 
 long khook_arch_init(void) {
