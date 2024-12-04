@@ -6,7 +6,7 @@ KHOOK (خوک) - Linux Kernel hooking engine.
 
 Include `Makefile.khook` to your `Makefile/Kbuild` file:
 ~~~
-NODNAME      ?= your-module-name
+MODNAME      ?= your-module-name
 ...
 include      /path/to/khook/Makefile.khook
 ...
