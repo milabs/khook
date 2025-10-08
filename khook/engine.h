@@ -19,10 +19,10 @@ typedef struct {
 
 #define KHOOK_(t, f)							\
 	static inline typeof(t) khook_##t; /* forward decl */		\
-	static void khook_##t##_orig(void) {				\
+	static noinline void khook_##t##_orig(void) {				\
 		asm(".rept 0x10\n.byte 0\n.endr\n");			\
 	}								\
-	static void khook_##t##_stub(void) {				\
+	static noinline void khook_##t##_stub(void) {				\
 		asm(".rept 0x80\n.byte 0\n.endr\n");			\
 	}								\
 	khook_t								\
