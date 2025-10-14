@@ -139,8 +139,9 @@ static inline void khook_arch_create_orig(khook_t *hook) {
 
 long khook_arch_write_kernel(long (* fn)(void *), void *arg) {
 	long res = 0, cr0, cr4;
+	unsigned long flags = 0;
 
-	asm volatile ("cli\n");
+	local_irq_save(flags);
 
 	cr0 = x86_read_cr0();
 	cr4 = x86_read_cr4();
@@ -155,7 +156,7 @@ long khook_arch_write_kernel(long (* fn)(void *), void *arg) {
 	if (cr4 & X86_CR4_CET)
 		x86_write_cr4(cr4);
 
-	asm volatile ("sti\n");
+	local_irq_restore(flags);
 
 	return res;
 }
